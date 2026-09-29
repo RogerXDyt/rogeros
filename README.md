@@ -2,6 +2,8 @@
 
 **Descargas:** mira la sección [Releases](https://github.com/RogerXDyt/rogeros/releases).
 
+**Licencia:** GPL-3.0. Puedes modificarlo, compartirlo y venderlo, pero publicando tu código con la misma licencia y diciendo que está basado en RogerOS de RogerXDyt. Detalles en [AVISO.md](AVISO.md) y [LICENSE](LICENSE).
+
 ```text
 RogerOS Linux 1.0 (Neón)
 ========================
