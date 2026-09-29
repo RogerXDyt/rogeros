@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Arranque RogerOS
+Exec=rogeros-primer-inicio
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

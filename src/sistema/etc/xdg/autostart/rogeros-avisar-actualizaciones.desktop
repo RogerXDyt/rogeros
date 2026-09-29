@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Avisos de actualización de RogerOS
+Exec=sh -c '[ -d /run/live ] && exit 0; sleep 90; while true; do rogeros-actualizar --comprobar; sleep 21600; done'
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

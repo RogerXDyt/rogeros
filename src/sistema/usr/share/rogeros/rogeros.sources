@@ -1,0 +1,5 @@
+Types: deb
+URIs: https://rogeros.rogercaner.workers.dev
+Suites: estable
+Components: main
+Signed-By: /usr/share/keyrings/rogeros.gpg

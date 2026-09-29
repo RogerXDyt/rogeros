@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Bienvenida RogerOS
+Exec=sh -c 'sleep 4; rogercentro --bienvenida'
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

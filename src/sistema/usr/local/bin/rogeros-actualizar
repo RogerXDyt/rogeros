@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Actualizador de RogerOS: busca novedades (Debian, servidor RogerOS y apps) y las instala
+con una barra de progreso. Uso: rogeros-actualizar [--comprobar]  (--comprobar solo avisa)"""
+import os, subprocess, sys, threading
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GLib
+
+HELPER = ["sudo", "-n", "/usr/lib/rogeros/actualizar-root"]
+LOGO = "/usr/share/rogeros/logo.png"
+
+CSS = b"""
+window { background-color: #0a0218; color: #e0f7ff; }
+.titulo { font-size: 20pt; font-weight: 800; color: #00e5ff; }
+.sub { color: #b98ce0; }
+.caja { background-color: #150533; border: 1px solid rgba(0,229,255,.35); border-radius: 12px; padding: 14px; }
+.neon { background-image: none; background-color: transparent; color: #00e5ff; border: 2px solid #00e5ff;
+        border-radius: 10px; padding: 8px 22px; font-weight: bold; }
+.neon:hover { background-color: rgba(0,229,255,.18); box-shadow: 0 0 12px #00e5ff; }
+.rosa { color: #ff2bd6; border-color: #ff2bd6; }
+progressbar progress { background-image: linear-gradient(to right, #00e5ff, #ff2bd6); border-radius: 6px; min-height: 14px; }
+progressbar trough { background-color: #1a0536; border-radius: 6px; min-height: 14px; }
+textview, textview text { background-color: #0a0218; color: #7fdfff; font-family: monospace; }
+"""
+
+
+try:
+    _AC = open(os.path.expanduser("~/.config/rogeros/acento")).read().strip() or "#00e5ff"
+except OSError:
+    _AC = "#00e5ff"
+CSS = CSS.replace(b"#00e5ff", _AC.encode()).replace(
+    b"0,229,255", ",".join(str(int(_AC[i:i + 2], 16)) for i in (1, 3, 5)).encode())
+
+
+def version():
+    """Versión que ve el usuario (p. ej. 1.0); la interna solo la usan las actualizaciones."""
+    for f in ("/etc/rogeros/version-publica", "/etc/rogeros/version"):
+        try:
+            return open(f).read().strip()
+        except OSError:
+            pass
+    return "?"
+
+
+def ejecutar(args, al_linea):
+    p = subprocess.Popen(HELPER + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for l in p.stdout:
+        al_linea(l.rstrip("\n"))
+    return p.wait()
+
+
+def comprobar_y_avisar():
+    """Modo silencioso (al iniciar sesión): si hay novedades, muestra una notificación."""
+    pend = []
+    ejecutar(["buscar"], lambda l: l.startswith("PAQUETE ") and pend.append(l.split()[1]))
+    if not pend:
+        return
+    rog = " (¡incluye una versión nueva de RogerOS!)" if "rogeros-base" in pend else ""
+    r = subprocess.run(["notify-send", "-i", LOGO, "-A", "abrir=Actualizar ahora", "-t", "30000",
+                        "Hay actualizaciones", f"{len(pend)} actualizaciones disponibles{rog}."],
+                       capture_output=True, text=True)
+    if r.stdout.strip() == "abrir":
+        subprocess.Popen([sys.argv[0]])
+
+
+class Ventana(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Actualizar RogerOS")
+        self.set_default_size(620, 480)
+        if os.path.exists(LOGO):
+            self.set_icon_from_file(LOGO)
+        prov = Gtk.CssProvider(); prov.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov, 800)
+        self.connect("destroy", Gtk.main_quit)
+
+        b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=22)
+        self.add(b)
+        t = Gtk.Label(label="Actualizar RogerOS", xalign=0); t.get_style_context().add_class("titulo")
+        self.estado = Gtk.Label(label=f"Versión instalada: RogerOS {version()}", xalign=0)
+        self.estado.get_style_context().add_class("sub")
+        b.pack_start(t, False, False, 0); b.pack_start(self.estado, False, False, 0)
+
+        self.barra = Gtk.ProgressBar(show_text=True); self.barra.set_text("")
+        b.pack_start(self.barra, False, False, 0)
+        self.detalle = Gtk.Label(label="", xalign=0); self.detalle.set_ellipsize(3)
+        b.pack_start(self.detalle, False, False, 0)
+
+        sc = Gtk.ScrolledWindow(); sc.get_style_context().add_class("caja")
+        self.log = Gtk.TextView(editable=False, cursor_visible=False, wrap_mode=Gtk.WrapMode.WORD_CHAR)
+        sc.add(self.log); b.pack_start(sc, True, True, 0)
+
+        fila = Gtk.Box(spacing=10)
+        self.btn = Gtk.Button(label="Instalar actualizaciones"); self.btn.get_style_context().add_class("neon")
+        self.btn.get_style_context().add_class("rosa"); self.btn.set_sensitive(False)
+        self.btn.connect("clicked", lambda *_: self.aplicar())
+        cerrar = Gtk.Button(label="Cerrar"); cerrar.get_style_context().add_class("neon")
+        cerrar.connect("clicked", lambda *_: self.destroy())
+        fila.pack_end(cerrar, False, False, 0); fila.pack_end(self.btn, False, False, 0)
+        b.pack_start(fila, False, False, 0)
+
+        self.show_all()
+        self.buscar()
+
+    # -- utilidades seguras desde hilos
+    def escribir(self, txt):
+        GLib.idle_add(lambda: (self.log.get_buffer().insert(self.log.get_buffer().get_end_iter(), txt + "\n"), False)[1])
+
+    def poner(self, frac=None, texto=None, detalle=None, estado=None):
+        def f():
+            if frac is not None: self.barra.set_fraction(frac)
+            if texto is not None: self.barra.set_text(texto)
+            if detalle is not None: self.detalle.set_text(detalle)
+            if estado is not None: self.estado.set_text(estado)
+            return False
+        GLib.idle_add(f)
+
+    # -- paso 1: buscar
+    def buscar(self):
+        self.pendientes = []
+        self.poner(texto="Buscando actualizaciones...", detalle="Conectando con Debian y con el servidor de RogerOS")
+        self.pulso = GLib.timeout_add(120, lambda: (self.barra.pulse(), True)[1])
+
+        def trabajo():
+            avisos = []
+            def linea(l):
+                if l.startswith("PAQUETE "): self.pendientes.append(l.split()[1])
+                elif l.startswith("AVISO "): avisos.append(l[6:])
+            r = ejecutar(["buscar"], linea)
+            GLib.idle_add(self.fin_buscar, r, avisos)
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def fin_buscar(self, r, avisos):
+        GLib.source_remove(self.pulso)
+        if r != 0 and not self.pendientes:
+            self.poner(0, "No se pudo buscar", "Revisa tu conexión a internet")
+            self.escribir("Error al buscar actualizaciones.")
+            return False
+        if any("rogeros" in a.lower() or "workers.dev" in a for a in avisos):
+            self.escribir("⚠ El servidor de RogerOS no responde ahora mismo (el PC de actualizaciones está apagado).\n"
+                          "  Se instalarán igualmente las de seguridad de Debian.")
+        n = len(self.pendientes)
+        if n == 0:
+            self.poner(1, "¡Todo al día!", "No hay nada que actualizar.")
+            return False
+        if "rogeros-base" in self.pendientes:
+            self.escribir("★ Hay una VERSIÓN NUEVA de RogerOS.")
+        self.escribir(f"{n} actualizaciones disponibles:")
+        for p in self.pendientes:
+            self.escribir("  • " + p)
+        self.poner(0, f"{n} actualizaciones disponibles", "Pulsa «Instalar actualizaciones»")
+        self.btn.set_sensitive(True)
+        return False
+
+    # -- paso 2: aplicar
+    def aplicar(self):
+        self.btn.set_sensitive(False)
+        self.poner(0, "Descargando...", "")
+
+        def trabajo():
+            total = [max(1, len(self.pendientes))]
+            def linea(l):
+                if l.startswith("TOTAL "):
+                    total[0] = max(1, int(l.split()[1]))
+                elif l.startswith("DESCARGA "):
+                    self.poner(detalle="Descargando " + l[9:])
+                elif l.startswith("PROGRESO "):
+                    _, n, _t, pkg = l.split(maxsplit=3)
+                    fr = int(n) / total[0]
+                    self.poner(min(fr, 1), f"{int(fr*100)} %", "Instalando " + pkg)
+                elif l.startswith("ERROR "):
+                    self.escribir("✘ " + l[6:])
+            r = ejecutar(["aplicar"], linea)
+            subprocess.run(["flatpak", "update", "--user", "-y", "--noninteractive"], capture_output=True)
+            GLib.idle_add(self.fin_aplicar, r)
+        threading.Thread(target=trabajo, daemon=True).start()
+
+    def fin_aplicar(self, r):
+        if r == 0:
+            self.poner(1, "¡Actualizado!", "Todo al día.", f"Versión instalada: RogerOS {version()}")
+            self.escribir("✔ Actualización terminada.")
+            # Aplicar ya en esta sesión lo que traiga la versión nueva (fondo, color...)
+            subprocess.Popen(["rogeros-usuario"])
+            if "rogeros-base" in self.pendientes and os.path.exists("/usr/share/rogeros/novedades.txt"):
+                self.escribir("\n" + open("/usr/share/rogeros/novedades.txt", encoding="utf-8").read())
+            if os.path.exists("/var/run/reboot-required"):
+                self.escribir("Reinicia el ordenador para terminar de aplicar algunos cambios.")
+        else:
+            self.poner(texto="Hubo un problema", detalle="Mira el registro de arriba")
+            self.escribir(f"✘ La actualización terminó con errores (código {r}).")
+        return False
+
+
+if __name__ == "__main__":
+    if "--comprobar" in sys.argv:
+        comprobar_y_avisar()
+    else:
+        Ventana()
+        Gtk.main()

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Abre el instalador Calamares mostrando una barra de carga hasta que aparece su ventana
+[ -d /run/live ] || { zenity --info --title="RogerOS" --text="RogerOS ya está instalado en este ordenador."; exit 0; }
+pgrep -x calamares >/dev/null && { wmctrl -a Calamares 2>/dev/null; exit 0; }
+
+(
+  for i in $(seq 1 180); do
+    if wmctrl -l 2>/dev/null | grep -qiE 'calamares|instal'; then echo 100; exit 0; fi
+    pgrep -x calamares >/dev/null || [ $i -lt 10 ] || { echo "# El instalador no ha arrancado"; sleep 4; echo 100; exit 1; }
+    p=$(( i * 95 / 60 )); [ $p -gt 95 ] && p=95
+    echo $p
+    echo "# Preparando el instalador de RogerOS...  ($i s)"
+    sleep 1
+  done
+  echo 100
+) | zenity --progress --auto-close --no-cancel --width=420 \
+      --title="Instalar RogerOS" --text="Preparando el instalador de RogerOS..." &
+
+if sudo -n true 2>/dev/null; then
+  sudo -E calamares -d > /tmp/calamares.log 2>&1
+else
+  pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" calamares -d > /tmp/calamares.log 2>&1
+fi

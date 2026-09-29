@@ -1,0 +1,4 @@
+# RogerOS: memoria comprimida en RAM (más rápida que el swap en disco)
+ALGO=zstd
+PERCENT=50
+PRIORITY=100

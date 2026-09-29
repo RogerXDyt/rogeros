@@ -1,0 +1,114 @@
+#!/bin/bash
+# roger — la herramienta central de RogerOS Linux
+C='\e[1;96m'; M='\e[1;95m'; V='\e[1;92m'; R='\e[1;91m'; N='\e[0m'
+ok()  { echo -e "${V}✔${N} $*"; }
+err() { echo -e "${R}✘${N} $*" >&2; exit 1; }
+tit() { echo -e "${M}▶${N} ${C}$*${N}"; }
+root() { [ "$(id -u)" = 0 ] || exec sudo "$0" "$CMD" "$@"; }
+
+ayuda() {
+cat <<EOF
+$(echo -e "${C}ROGER${M}OS${N}") — comandos:
+
+  roger actualizar          Actualiza todo: sistema, apps y RogerOS
+  roger tienda              Abre la Tienda RogerOS
+  roger instalar <app>      Instala un programa (Flathub o Debian)
+  roger quitar <app>        Desinstala un programa
+  roger buscar <texto>      Busca programas
+  roger limpiar             Borra caché, paquetes huérfanos y logs viejos
+  roger info                Ficha del sistema
+  roger modo <juego|normal|ahorro>   Perfil de rendimiento
+  roger steam               Prepara el PC para jugar (Steam, Wine, drivers 32 bits)
+  roger nvidia              Instala el driver propietario de NVIDIA
+  roger copia <carpeta>     Copia de seguridad comprimida en ~/Copias
+  roger centro              Abre el Centro de control gráfico
+EOF
+}
+
+CMD="$1"; shift 2>/dev/null
+case "$CMD" in
+  actualizar|update)
+    tit "Buscando actualizaciones (Debian + servidor RogerOS)"
+    sudo -n /usr/lib/rogeros/actualizar-root buscar | grep -E '^(PENDIENTES|AVISO)'
+    tit "Instalando"
+    sudo -n /usr/lib/rogeros/actualizar-root aplicar | awk '/^PROGRESO/{printf "\r  %d/%d %s          ", $2, $3, $4} END{print ""}'
+    flatpak update --user -y --noninteractive >/dev/null 2>&1
+    ok "Todo actualizado (RogerOS $(cat /etc/rogeros/version-publica 2>/dev/null || cat /etc/rogeros/version))" ;;
+  instalar|install)
+    [ -z "$1" ] && err "Dime qué instalar: roger instalar discord"
+    flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    for app in "$@"; do
+      if [[ "$app" == *.*.* ]]; then            # ya es un id de Flathub (com.discordapp.Discord)
+        id="$app"
+      else                                      # buscarlo por nombre en Flathub
+        id=$(curl -fsS -X POST -H 'Content-Type: application/json' -d "{\"query\":\"$app\"}" \
+             https://flathub.org/api/v2/search | python3 -c 'import json,sys; h=json.load(sys.stdin)["hits"]; print(h[0]["app_id"] if h else "")')
+      fi
+      if [ -n "$id" ]; then
+        tit "Instalando $id (Flathub)"
+        flatpak --user install -y --noninteractive flathub "$id" && ok "$id instalado: ya está en el menú"
+      elif apt-cache show "$app" >/dev/null 2>&1; then
+        tit "Instalando $app (Debian)"; sudo apt-get install -y "$app" && ok "$app instalado"
+      else
+        err "No encuentro '$app'"
+      fi
+    done ;;
+  quitar|remove)
+    for app in "$@"; do
+      if flatpak --user info "$app" >/dev/null 2>&1; then flatpak --user uninstall -y "$app"
+      elif dpkg -s "$app" >/dev/null 2>&1; then sudo apt-get remove -y "$app"
+      else
+        id=$(flatpak --user list --app --columns=application,name | grep -i "$app" | head -1 | cut -f1)
+        [ -n "$id" ] && flatpak --user uninstall -y "$id" || err "No tienes '$app' instalado"
+      fi
+    done; ok "Hecho" ;;
+  tienda) exec rogertienda ;;
+  buscar|search)
+    tit "Flathub"
+    curl -fsS -X POST -H 'Content-Type: application/json' -d "{\"query\":\"$*\"}" https://flathub.org/api/v2/search |
+      python3 -c 'import json,sys
+for h in json.load(sys.stdin)["hits"][:15]: print(f"  {h[\"name\"]:<32} {h[\"app_id\"]}")'
+    tit "Debian"; apt-cache search --names-only "$*" | head -10 ;;
+  limpiar|clean)
+    root "$@"; antes=$(df --output=avail / | tail -1)
+    apt-get -y autoremove --purge; apt-get clean
+    journalctl --vacuum-time=7d >/dev/null 2>&1
+    flatpak uninstall --unused -y >/dev/null 2>&1
+    rm -rf /home/*/.cache/thumbnails/* 2>/dev/null
+    despues=$(df --output=avail / | tail -1)
+    ok "Liberados $(( (despues-antes)/1024 )) MB" ;;
+  info) fastfetch ;;
+  modo)
+    root "$@"
+    case "$1" in
+      juego)
+        echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
+        sysctl -q vm.swappiness=10
+        echo juego > /etc/rogeros/modo; ok "Modo JUEGO: CPU a tope, menos swap" ;;
+      ahorro)
+        echo powersave | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
+        sysctl -q vm.swappiness=60
+        echo ahorro > /etc/rogeros/modo; ok "Modo AHORRO: batería y silencio" ;;
+      normal|"")
+        echo schedutil | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1
+        sysctl -q vm.swappiness=20
+        echo normal > /etc/rogeros/modo; ok "Modo NORMAL" ;;
+      *) err "Modos: juego, normal, ahorro" ;;
+    esac ;;
+  steam)
+    root "$@"; tit "Activando 32 bits y preparando juegos"
+    dpkg --add-architecture i386 && apt-get update
+    apt-get install -y steam-installer mesa-vulkan-drivers mesa-vulkan-drivers:i386 libgl1-mesa-dri:i386 wine wine64 gamemode
+    ok "Listo: abre Steam desde el menú. Usa 'gamemoderun %command%' en tus juegos" ;;
+  nvidia)
+    root "$@"; tit "Instalando driver NVIDIA"
+    apt-get update && apt-get install -y linux-headers-amd64 nvidia-driver firmware-misc-nonfree
+    ok "Reinicia para usar la gráfica NVIDIA" ;;
+  copia|backup)
+    src="${1:-$HOME}"; mkdir -p ~/Copias
+    f=~/Copias/copia-$(basename "$src")-$(date +%Y%m%d-%H%M).tar.zst
+    tit "Copiando $src"; tar --exclude=Copias -I 'zstd -T0' -cf "$f" -C "$(dirname "$src")" "$(basename "$src")" && ok "Guardado en $f ($(du -h "$f" | cut -f1))" ;;
+  centro) exec rogercentro ;;
+  ""|ayuda|help|-h|--help) ayuda ;;
+  *) err "No conozco '$CMD'. Escribe: roger ayuda" ;;
+esac

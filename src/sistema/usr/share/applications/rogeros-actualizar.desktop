@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Actualizar RogerOS
+Comment=Instala las novedades del sistema, las apps y RogerOS
+Exec=rogeros-actualizar
+Icon=/usr/share/rogeros/logo.png
+Categories=System;Settings;
+Keywords=actualizar;update;novedades;

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05010f"/>
+      <stop offset="0.55" stop-color="#1a0536"/>
+      <stop offset="0.62" stop-color="#3a0a52"/>
+      <stop offset="1" stop-color="#05010f"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff2bd6"/>
+      <stop offset="1" stop-color="#00e5ff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigglow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+    <clipPath id="sunclip">
+      <rect x="0" y="0" width="1920" height="480"/>
+      <rect x="0" y="490" width="1920" height="22"/>
+      <rect x="0" y="524" width="1920" height="16"/>
+      <rect x="0" y="552" width="1920" height="10"/>
+      <rect x="0" y="574" width="1920" height="6"/>
+    </clipPath>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05010f" stop-opacity="1"/>
+      <stop offset="0.35" stop-color="#05010f" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <!-- estrellas -->
+  <g fill="#ffffff" opacity="0.7">
+    <circle cx="120" cy="80" r="1.5"/><circle cx="340" cy="190" r="1"/><circle cx="560" cy="60" r="2"/>
+    <circle cx="780" cy="150" r="1"/><circle cx="1010" cy="40" r="1.5"/><circle cx="1260" cy="130" r="1"/>
+    <circle cx="1480" cy="70" r="2"/><circle cx="1700" cy="200" r="1"/><circle cx="1850" cy="90" r="1.5"/>
+    <circle cx="240" cy="330" r="1"/><circle cx="1600" cy="340" r="1"/><circle cx="1390" cy="260" r="1.5"/>
+    <circle cx="460" cy="280" r="1.5"/><circle cx="90" cy="420" r="1"/><circle cx="1820" cy="430" r="1"/>
+  </g>
+  <!-- sol -->
+  <circle cx="960" cy="440" r="230" fill="#ff2bd6" opacity="0.35" filter="url(#bigglow)"/>
+  <circle cx="960" cy="440" r="200" fill="url(#sun)" clip-path="url(#sunclip)"/>
+  <!-- montañas -->
+  <path d="M0 620 L180 520 L320 580 L470 470 L620 600 L760 540 L960 610 L1150 530 L1300 590 L1460 480 L1620 570 L1780 510 L1920 580 L1920 620 Z" fill="#0b0220" stroke="#00e5ff" stroke-width="2" filter="url(#glow)"/>
+  <!-- suelo con cuadrícula -->
+  <rect x="0" y="620" width="1920" height="460" fill="#07011a"/>
+  <g stroke="#ff2bd6" stroke-width="2" filter="url(#glow)" opacity="0.9">
+    <line x1="0" y1="620" x2="1920" y2="620"/>
+    <line x1="0" y1="634" x2="1920" y2="634"/>
+    <line x1="0" y1="654" x2="1920" y2="654"/>
+    <line x1="0" y1="682" x2="1920" y2="682"/>
+    <line x1="0" y1="720" x2="1920" y2="720"/>
+    <line x1="0" y1="772" x2="1920" y2="772"/>
+    <line x1="0" y1="842" x2="1920" y2="842"/>
+    <line x1="0" y1="936" x2="1920" y2="936"/>
+    <line x1="0" y1="1060" x2="1920" y2="1060"/>
+    <line x1="960" y1="620" x2="960" y2="1080"/>
+    <line x1="960" y1="620" x2="760" y2="1080"/><line x1="960" y1="620" x2="1160" y2="1080"/>
+    <line x1="960" y1="620" x2="540" y2="1080"/><line x1="960" y1="620" x2="1380" y2="1080"/>
+    <line x1="960" y1="620" x2="300" y2="1080"/><line x1="960" y1="620" x2="1620" y2="1080"/>
+    <line x1="960" y1="620" x2="20" y2="1080"/><line x1="960" y1="620" x2="1900" y2="1080"/>
+    <line x1="960" y1="620" x2="-320" y2="1080"/><line x1="960" y1="620" x2="2240" y2="1080"/>
+    <line x1="960" y1="620" x2="-760" y2="1080"/><line x1="960" y1="620" x2="2680" y2="1080"/>
+    <line x1="960" y1="620" x2="-1400" y2="1080"/><line x1="960" y1="620" x2="3320" y2="1080"/>
+  </g>
+  <rect x="0" y="620" width="1920" height="460" fill="url(#fade)"/>
+  <!-- título -->
+  <text x="960" y="200" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="96" letter-spacing="18" fill="none" stroke="#00e5ff" stroke-width="3" filter="url(#glow)">ROGER<tspan stroke="#ff2bd6">OS</tspan></text>
+</svg>

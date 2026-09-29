@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Instalar RogerOS
+Comment=Instala RogerOS en el disco de tu ordenador
+Exec=rogeros-instalar
+Icon=/usr/share/rogeros/logo.png
+Terminal=false

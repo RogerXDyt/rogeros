@@ -1,0 +1,35 @@
+#!/bin/bash
+# Parte con permisos del actualizador de RogerOS. Solo sabe hacer dos cosas:
+#   buscar   -> descarga la lista de novedades (Debian + servidor RogerOS)
+#   aplicar  -> instala todas las actualizaciones, mostrando "PROGRESO n TOTAL paquete"
+# Se permite sin contraseña (sudoers) porque no acepta nada más.
+export DEBIAN_FRONTEND=noninteractive LANG=C
+set -o pipefail
+APT_OPTS=(-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold -y)
+
+case "$1" in
+  buscar)
+    apt-get update 2>&1 | grep -E '^(Err|W:|E:)' | sed 's/^/AVISO /' || true
+    N=$(apt-get -s full-upgrade 2>/dev/null | grep -c '^Inst ')
+    echo "PENDIENTES $N"
+    apt-get -s full-upgrade 2>/dev/null | awk '/^Inst /{print "PAQUETE", $2}'
+    ;;
+  aplicar)
+    TOTAL=$(apt-get -s full-upgrade 2>/dev/null | grep -c '^Inst ')
+    echo "TOTAL $TOTAL"
+    n=0
+    apt-get "${APT_OPTS[@]}" full-upgrade 2>&1 | while IFS= read -r l; do
+      case "$l" in
+        Get:*)          echo "DESCARGA $(echo "$l" | awk '{print $(NF-3)}')" ;;
+        "Setting up "*) n=$((n+1)); p=${l#Setting up }; echo "PROGRESO $n $TOTAL ${p%% *}" ;;
+        E:*)            echo "ERROR ${l#E: }" ;;
+      esac
+    done
+    r=$?
+    apt-get -y autoremove >/dev/null 2>&1
+    command -v flatpak >/dev/null && flatpak update -y --noninteractive --system >/dev/null 2>&1
+    echo "FIN $r"
+    exit $r
+    ;;
+  *) echo "uso: $0 buscar|aplicar" >&2; exit 2 ;;
+esac

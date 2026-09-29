@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=RogerOS
+Description=Arranque neón de RogerOS Linux
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/rogeros
+ScriptFile=/usr/share/plymouth/themes/rogeros/rogeros.script

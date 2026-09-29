@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Tienda RogerOS: miles de apps de Flathub con iconos, categorías y búsqueda.
+Instala en la cuenta del usuario (flatpak --user): no pide contraseña y no toca el sistema."""
+import hashlib, json, os, re, subprocess, threading, urllib.request, urllib.parse
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GLib, GdkPixbuf, Pango
+
+API = "https://flathub.org/api/v2"
+CACHE = os.path.expanduser("~/.cache/rogertienda")
+LOGO = "/usr/share/rogeros/logo.png"
+POR_PAGINA = 36
+
+CATEGORIAS = [("Populares", None, "⭐"), ("Juegos", "Game", "🎮"), ("Internet", "Network", "🌐"),
+              ("Música y vídeo", "AudioVideo", "🎵"), ("Gráficos y 3D", "Graphics", "🎨"),
+              ("Programación", "Development", "💻"), ("Oficina", "Office", "📄"),
+              ("Educación", "Education", "🎓"), ("Ciencia", "Science", "🔬"),
+              ("Utilidades", "Utility", "🧰"), ("Sistema", "System", "⚙️")]
+
+CSS = b"""
+window, .fondo { background-color: #0a0218; color: #e0f7ff; }
+.lateral { background-color: #12042a; border-right: 1px solid #00e5ff; }
+.lateral row { padding: 10px 16px; font-size: 12pt; }
+.lateral row:selected { background-color: rgba(255,43,214,.25); box-shadow: inset 4px 0 #ff2bd6; }
+.titulo { font-size: 22pt; font-weight: 800; color: #00e5ff; }
+.sub { color: #b98ce0; }
+.app { background-color: #150533; border: 1px solid rgba(0,229,255,.25); border-radius: 12px; padding: 12px; }
+.app:hover { border-color: #ff2bd6; }
+.nombre { font-weight: bold; font-size: 11pt; color: #ffffff; }
+.resumen { color: #b98ce0; font-size: 9pt; }
+.neon { background-image: none; background-color: transparent; color: #00e5ff; border: 2px solid #00e5ff;
+        border-radius: 9px; padding: 4px 14px; font-weight: bold; }
+.neon:hover { background-color: rgba(0,229,255,.18); box-shadow: 0 0 10px #00e5ff; }
+.rosa { color: #ff2bd6; border-color: #ff2bd6; }
+.verde { color: #39ff14; border-color: #39ff14; }
+entry { background-color: #150533; color: #e0f7ff; border: 1px solid #00e5ff; border-radius: 10px; padding: 8px; }
+"""
+
+
+try:
+    _AC = open(os.path.expanduser("~/.config/rogeros/acento")).read().strip() or "#00e5ff"
+except OSError:
+    _AC = "#00e5ff"
+CSS = CSS.replace(b"#00e5ff", _AC.encode()).replace(
+    b"0,229,255", ",".join(str(int(_AC[i:i + 2], 16)) for i in (1, 3, 5)).encode())
+
+
+def http_json(url, datos=None):
+    req = urllib.request.Request(url, data=json.dumps(datos).encode() if datos else None,
+                                 headers={"Content-Type": "application/json", "User-Agent": "RogerTienda/1.0"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return json.loads(r.read().decode())
+
+
+def flatpak(*args):
+    return subprocess.run(["flatpak", "--user", *args], capture_output=True, text=True)
+
+
+def preparar_flathub():
+    flatpak("remote-add", "--if-not-exists", "flathub", "https://dl.flathub.org/repo/flathub.flatpakrepo")
+
+
+def instaladas():
+    r = flatpak("list", "--app", "--columns=application")
+    return set(r.stdout.split())
+
+
+class Tarjeta(Gtk.Box):
+    def __init__(self, tienda, app):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.tienda, self.app = tienda, app
+        self.get_style_context().add_class("app")
+        self.set_size_request(230, 190)
+        arriba = Gtk.Box(spacing=10)
+        self.icono = Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.DIALOG)
+        self.icono.set_pixel_size(64)
+        arriba.pack_start(self.icono, False, False, 0)
+        n = Gtk.Label(label=app.get("name", app["app_id"]), xalign=0, wrap=True, max_width_chars=16)
+        n.get_style_context().add_class("nombre")
+        arriba.pack_start(n, True, True, 0)
+        self.pack_start(arriba, False, False, 0)
+        r = Gtk.Label(label=app.get("summary") or "", xalign=0, wrap=True, max_width_chars=28, lines=3)
+        r.set_ellipsize(Pango.EllipsizeMode.END); r.get_style_context().add_class("resumen")
+        self.pack_start(r, True, True, 0)
+        self.boton = Gtk.Button(); self.boton.get_style_context().add_class("neon")
+        self.boton.connect("clicked", self.pulsar)
+        self.pack_end(self.boton, False, False, 0)
+        self.actualizar_boton()
+        tienda.cargar_icono(app.get("icon"), self.icono)
+
+    def actualizar_boton(self, texto=None):
+        ya = self.app["app_id"] in self.tienda.instaladas
+        ctx = self.boton.get_style_context()
+        for c in ("rosa", "verde"): ctx.remove_class(c)
+        if texto:
+            self.boton.set_label(texto); self.boton.set_sensitive(False)
+        elif ya:
+            self.boton.set_label("Abrir  ·  Quitar"); ctx.add_class("verde"); self.boton.set_sensitive(True)
+        else:
+            self.boton.set_label("Instalar"); ctx.add_class("rosa"); self.boton.set_sensitive(True)
+
+    def pulsar(self, _b):
+        aid = self.app["app_id"]
+        if aid in self.tienda.instaladas:
+            self.menu_instalada(aid)
+        else:
+            self.tienda.instalar(aid, self)
+
+    def menu_instalada(self, aid):
+        m = Gtk.Menu()
+        for txt, fn in (("Abrir", lambda *_: subprocess.Popen(["flatpak", "run", aid])),
+                        ("Desinstalar", lambda *_: self.tienda.quitar(aid, self))):
+            it = Gtk.MenuItem(label=txt); it.connect("activate", fn); m.append(it)
+        m.show_all(); m.popup_at_widget(self.boton, Gdk.Gravity.SOUTH, Gdk.Gravity.NORTH, None)
+
+
+class Tienda(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Tienda RogerOS")
+        self.set_default_size(1150, 720)
+        if os.path.exists(LOGO): self.set_icon_from_file(LOGO)
+        prov = Gtk.CssProvider(); prov.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), prov, 800)
+        self.connect("destroy", Gtk.main_quit)
+        os.makedirs(CACHE, exist_ok=True)
+        self.instaladas = set()
+        self.tarjetas = {}
+        self.pagina, self.consulta = 1, None
+
+        caja = Gtk.Box(); self.add(caja)
+        lateral = Gtk.ListBox(); lateral.get_style_context().add_class("lateral"); lateral.set_size_request(210, -1)
+        for nombre, cat, emoji in CATEGORIAS + [("Mis apps", "__mias__", "📦")]:
+            f = Gtk.ListBoxRow(); f.dato = (nombre, cat)
+            f.add(Gtk.Label(label=f"{emoji}  {nombre}", xalign=0)); lateral.add(f)
+        lateral.connect("row-selected", lambda _l, f: f and self.ver(*f.dato))
+        caja.pack_start(lateral, False, False, 0)
+
+        der = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin=18)
+        caja.pack_start(der, True, True, 0)
+        cab = Gtk.Box(spacing=12)
+        self.titulo = Gtk.Label(label="Tienda", xalign=0); self.titulo.get_style_context().add_class("titulo")
+        cab.pack_start(self.titulo, True, True, 0)
+        self.buscador = Gtk.SearchEntry(placeholder_text="Buscar apps y juegos…"); self.buscador.set_size_request(340, -1)
+        self.buscador.connect("activate", lambda e: e.get_text().strip() and self.ver("Resultados", "__buscar__"))
+        cab.pack_end(self.buscador, False, False, 0)
+        der.pack_start(cab, False, False, 0)
+        self.estado = Gtk.Label(label="", xalign=0); self.estado.get_style_context().add_class("sub")
+        der.pack_start(self.estado, False, False, 0)
+
+        sc = Gtk.ScrolledWindow(); sc.get_style_context().add_class("fondo")
+        self.rejilla = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+                                   min_children_per_line=2, max_children_per_line=6,
+                                   column_spacing=12, row_spacing=12, valign=Gtk.Align.START)
+        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        v.pack_start(self.rejilla, False, False, 0)
+        self.mas = Gtk.Button(label="Cargar más"); self.mas.get_style_context().add_class("neon")
+        self.mas.set_halign(Gtk.Align.CENTER); self.mas.connect("clicked", lambda *_: self.cargar(mas=True))
+        v.pack_start(self.mas, False, False, 8)
+        sc.add(v); der.pack_start(sc, True, True, 0)
+
+        self.show_all(); self.mas.hide()
+        threading.Thread(target=self.arrancar, daemon=True).start()
+        lateral.select_row(lateral.get_row_at_index(0))
+
+    def arrancar(self):
+        preparar_flathub()
+        self.instaladas = instaladas()
+        GLib.idle_add(lambda: [t.actualizar_boton() for t in self.tarjetas.values()] and False)
+
+    # ---------- navegación ----------
+    def ver(self, nombre, cat):
+        self.titulo.set_text(nombre)
+        self.categoria, self.pagina = cat, 1
+        if cat == "__buscar__":
+            self.consulta = self.buscador.get_text().strip()
+            self.titulo.set_text(f"Resultados: {self.consulta}")
+        self.cargar()
+
+    def cargar(self, mas=False):
+        if not mas:
+            for h in self.rejilla.get_children(): h.destroy()
+            self.tarjetas.clear()
+        else:
+            self.pagina += 1
+        self.estado.set_text("Cargando…"); self.mas.hide()
+        threading.Thread(target=self._cargar_hilo, args=(self.categoria, self.pagina), daemon=True).start()
+
+    def _cargar_hilo(self, cat, pagina):
+        try:
+            if cat == "__mias__":
+                self.instaladas = instaladas()
+                apps = []
+                for aid in sorted(self.instaladas):
+                    try:
+                        d = http_json(f"{API}/appstream/{aid}")
+                        apps.append({"app_id": aid, "name": d.get("name", aid), "summary": d.get("summary", ""),
+                                     "icon": d.get("icon")})
+                    except Exception:
+                        apps.append({"app_id": aid, "name": aid, "summary": ""})
+                total = len(apps)
+            elif cat == "__buscar__":
+                d = http_json(f"{API}/search", {"query": self.consulta})
+                apps, total = d.get("hits", []), d.get("totalHits", 0)
+            elif cat is None:
+                d = http_json(f"{API}/collection/popular?page={pagina}&per_page={POR_PAGINA}")
+                apps, total = d.get("hits", []), d.get("totalHits", 0)
+            else:
+                d = http_json(f"{API}/collection/category/{cat}?page={pagina}&per_page={POR_PAGINA}")
+                apps, total = d.get("hits", []), d.get("totalHits", 0)
+            GLib.idle_add(self._mostrar, apps, total, cat, pagina)
+        except Exception as e:
+            GLib.idle_add(self.estado.set_text, f"Sin conexión con la tienda ({e.__class__.__name__}). ¿Hay internet?")
+
+    def _mostrar(self, apps, total, cat, pagina):
+        if cat != self.categoria:
+            return False
+        for a in apps:
+            if a.get("app_id") and a["app_id"] not in self.tarjetas:
+                t = Tarjeta(self, a); self.tarjetas[a["app_id"]] = t
+                self.rejilla.add(t)
+        self.rejilla.show_all()
+        n = len(self.tarjetas)
+        self.estado.set_text(f"{n} de {total} apps" if total else "No hay nada aquí todavía")
+        if cat not in ("__mias__", "__buscar__") and n < total:
+            self.mas.show()
+        return False
+
+    # ---------- iconos ----------
+    def cargar_icono(self, url, imagen):
+        if not url:
+            return
+        ruta = os.path.join(CACHE, hashlib.md5(url.encode()).hexdigest() + ".png")
+
+        def hilo():
+            try:
+                if not os.path.exists(ruta):
+                    req = urllib.request.Request(url, headers={"User-Agent": "RogerTienda/1.0"})
+                    with urllib.request.urlopen(req, timeout=20) as r, open(ruta, "wb") as f:
+                        f.write(r.read())
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_size(ruta, 64, 64)
+                GLib.idle_add(imagen.set_from_pixbuf, pb)
+            except Exception:
+                pass
+        threading.Thread(target=hilo, daemon=True).start()
+
+    # ---------- instalar / quitar ----------
+    def instalar(self, aid, tarjeta):
+        tarjeta.actualizar_boton("Instalando… 0 %")
+
+        def hilo():
+            p = subprocess.Popen(["flatpak", "--user", "install", "-y", "--noninteractive", "flathub", aid],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            buf = ""
+            while True:
+                c = p.stdout.read(1)
+                if not c:
+                    break
+                buf += c
+                if c in "\r\n":
+                    m = re.findall(r"(\d{1,3})%", buf)
+                    if m:
+                        GLib.idle_add(tarjeta.actualizar_boton, f"Instalando… {m[-1]} %")
+                    buf = ""
+            ok = p.wait() == 0
+            self.instaladas = instaladas()
+            GLib.idle_add(tarjeta.actualizar_boton)
+            GLib.idle_add(self.estado.set_text, f"✔ {aid} instalada: la tienes en el menú" if ok
+                          else f"✘ No se pudo instalar {aid}")
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def quitar(self, aid, tarjeta):
+        tarjeta.actualizar_boton("Quitando…")
+
+        def hilo():
+            ok = flatpak("uninstall", "-y", "--noninteractive", aid).returncode == 0
+            self.instaladas = instaladas()
+            GLib.idle_add(tarjeta.actualizar_boton)
+            GLib.idle_add(self.estado.set_text, f"{aid} desinstalada" if ok else f"No se pudo quitar {aid}")
+        threading.Thread(target=hilo, daemon=True).start()
+
+
+if __name__ == "__main__":
+    Tienda()
+    Gtk.main()

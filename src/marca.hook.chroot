@@ -1,0 +1,64 @@
+#!/bin/sh
+# Quita "Debian" de todo lo que ve el usuario y pone RogerOS
+set -e
+
+# Identidad para programas que leen lsb-release
+cat > /etc/lsb-release <<X
+DISTRIB_ID=RogerOS
+DISTRIB_RELEASE=1.0
+DISTRIB_CODENAME=neon
+DISTRIB_DESCRIPTION="RogerOS Linux 1.0"
+X
+
+# GRUB del sistema instalado: nombre y fondo (vale aunque grub se instale después)
+mkdir -p /etc/default/grub.d
+cat > /etc/default/grub.d/rogeros.cfg <<X
+GRUB_DISTRIBUTOR="RogerOS"
+# Linux arranca en modo texto y luego pone la gráfica él mismo (evita pantalla congelada)
+GRUB_GFXPAYLOAD_LINUX=text
+GRUB_DISABLE_SUBMENU=y
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3"
+GRUB_TIMEOUT=2
+GRUB_BACKGROUND="/usr/share/backgrounds/rogeros/wallpaper.png"
+X
+
+# Instalador Calamares: todos sus textos, su presentación y la entrada UEFI
+for d in /etc/calamares /usr/share/calamares; do
+  [ -d "$d" ] || continue
+  find "$d" -type f \( -name '*.conf' -o -name '*.desc' -o -name '*.qml' -o -name '*.js' -o -name '*.html' \) | while read f; do
+    sed -i -e 's/Debian GNU\/Linux/RogerOS Linux/g' \
+           -e 's/efiBootloaderId: *"*debian"*/efiBootloaderId: "rogeros"/' \
+           -e 's/\bDebian\b/RogerOS/g' "$f"
+  done
+done
+# Al terminar de instalar: volcar y desmontar limpio antes de reiniciar
+F=/etc/calamares/modules/finished.conf
+[ -f $F ] && sed -i 's|^restartNowCommand:.*|restartNowCommand: "/usr/local/bin/rogeros-reiniciar"|' $F
+
+# Texto de la presentación mientras instala, en español
+Q=/etc/calamares/branding/rogeros/show.qml
+[ -f $Q ] && sed -i -e 's|Welcome to RogerOS Linux.<br/>|Bienvenido a RogerOS Linux.<br/>|' \
+  -e 's|The rest of the installation is automated and should complete in a few minutes.|El resto de la instalación es automática y tardará unos minutos. ¡Ve a por un refresco!|' $Q
+
+# Imágenes de la presentación del instalador -> fondo de RogerOS
+find /etc/calamares/branding/rogeros -name '*.png' ! -name 'logo*' | while read f; do
+  case "$(basename "$f")" in
+    *logo*|*icon*|*Icon*) cp /usr/share/rogeros/logo.png "$f" ;;
+    *) cp /usr/share/backgrounds/rogeros/wallpaper.png "$f" ;;
+  esac
+done 2>/dev/null || true
+
+# Menús y lanzadores del escritorio
+for f in /usr/share/applications/*.desktop; do
+  grep -q 'Debian' "$f" && sed -i -e 's/Debian GNU\/Linux/RogerOS Linux/g' -e '/^\(Name\|GenericName\|Comment\)/s/Debian/RogerOS/g' "$f"
+done
+
+# Firefox: marcadores y página "acerca de Debian"
+rm -f /usr/share/firefox-esr/distribution/distribution.ini 2>/dev/null || true
+
+# Mensaje de la consola al entrar
+: > /etc/motd
+
+# Fuente de actualizaciones de RogerOS (tu PC, firmada). Se activa al final para que
+# la construcción de la ISO no dependa de que el servidor esté encendido.
+cp /usr/share/rogeros/rogeros.sources /etc/apt/sources.list.d/rogeros.sources

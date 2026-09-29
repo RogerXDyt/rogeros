@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Tienda RogerOS
+Comment=Miles de apps y juegos con un clic
+Exec=rogertienda
+Icon=/usr/share/rogeros/logo.png
+Categories=System;PackageManager;
+Keywords=tienda;apps;juegos;instalar;store;

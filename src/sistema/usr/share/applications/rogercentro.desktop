@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Centro RogerOS
+Comment=Panel de control, rendimiento y tienda de apps
+Exec=rogercentro
+Icon=/usr/share/rogeros/logo.png
+Categories=Settings;System;
+Keywords=roger;tienda;apps;rendimiento;juego;

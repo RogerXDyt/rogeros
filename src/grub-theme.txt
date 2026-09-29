@@ -1,0 +1,46 @@
+desktop-image: "../splash.png"
+title-text: ""
+message-font: "Unifont Regular 16"
+terminal-font: "Unifont Regular 16"
+
++ label {
+        top = 100%-40
+        left = 0
+        width = 100%
+        height = 20
+        text = "Flechas para elegir  -  Enter para arrancar"
+        align = "center"
+        color = "#ff2bd6"
+        font = "Unifont Regular 16"
+}
+
++ boot_menu {
+        left = 13%
+        width = 74%
+        top = 46%
+        height = 34%
+        item_color = "#7fdfff"
+        item_font = "Unifont Regular 16"
+        selected_item_color = "#ffffff"
+        selected_item_font = "Unifont Regular 16"
+        item_height = 20
+        item_padding = 4
+        item_spacing = 6
+        icon_width = 0
+        icon_height = 0
+        item_icon_space = 0
+}
+
++ progress_bar {
+        id = "__timeout__"
+        left = 15%
+        top = 100%-80
+        height = 12
+        width = 70%
+        font = "Unifont Regular 16"
+        text_color = "#ffffff"
+        fg_color = "#ff2bd6"
+        bg_color = "#1a0536"
+        border_color = "#00e5ff"
+        text = "@TIMEOUT_NOTIFICATION_LONG@"
+}

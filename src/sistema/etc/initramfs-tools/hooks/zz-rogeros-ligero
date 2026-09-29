@@ -1,0 +1,32 @@
+#!/bin/sh
+# RogerOS: initrd ligero (de ~140 MB a ~40 MB).
+# Plymouth pide TODOS los drivers de gráfica y mkinitramfs los copia con su firmware
+# (~200 MB) al terminar los hooks. Los quitamos de la lista pendiente: el sistema los carga
+# después desde el disco, donde sí está todo el firmware. Mientras tanto, la pantalla de
+# carga usa el framebuffer genérico (simpledrm / bochs / virtio).
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+
+# i915 (Intel, la gráfica de casi todos los portátiles) se QUEDA: sin él la pantalla de carga
+# sale negra en arranque BIOS (ThinkPad X230). Solo pesa ~11 MB con su firmware.
+GRANDES='(^|/)(amdgpu|radeon|nouveau|xe|nvidia[^/]*|nfp|qed|qede|bnx2x|liquidio|liquidio_vf|mlx5_core|cxgb4)(\.ko[^/]*)?$'
+
+# Lista de módulos pendientes de copiar (fichero temporal de mkinitramfs)
+for lista in "${TMPDIR:-/var/tmp}"/modules_*; do
+  [ -f "$lista" ] || continue
+  grep -v -E "$GRANDES" "$lista" > "$lista.tmp" || true
+  cat "$lista.tmp" > "$lista"; rm -f "$lista.tmp"
+done
+
+# Lo que ya se hubiera copiado antes de los hooks
+for base in "${DESTDIR}/usr/lib" "${DESTDIR}/lib"; do
+  for d in amd radeon nouveau xe; do
+    rm -rf "$base"/modules/*/kernel/drivers/gpu/drm/$d
+  done
+  rm -rf "$base"/modules/*/kernel/drivers/net/ethernet/netronome "$base"/modules/*/kernel/drivers/net/ethernet/cavium/liquidio
+  for f in nvidia amdgpu radeon xe nouveau netronome qed bnx2x liquidio mellanox cxgb4; do
+    rm -rf "$base"/firmware/$f
+  done
+done
+exit 0

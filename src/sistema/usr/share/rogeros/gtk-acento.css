@@ -1,0 +1,37 @@
+/* RogerOS: color de acento. Lo genera rogeros-acento a partir de esta plantilla.
+   ACENTO = color elegido (#rrggbb), ACENTO_RGB = el mismo en r,g,b */
+@define-color acento ACENTO;
+@define-color theme_selected_bg_color ACENTO;
+@define-color theme_selected_fg_color #0a0218;
+@define-color selected_bg_color ACENTO;
+@define-color accent_color ACENTO;
+@define-color accent_bg_color ACENTO;
+
+/* Selecciones de texto, listas y menús */
+*:selected, selection, row:selected, treeview.view:selected, iconview:selected,
+menu menuitem:hover, menubar > menuitem:hover, popover modelbutton:hover {
+  background-color: ACENTO; color: #0a0218;
+}
+/* Botones */
+button:hover { border-color: ACENTO; box-shadow: 0 0 6px rgba(ACENTO_RGB, 0.7); }
+button:checked, button.suggested-action { background-color: rgba(ACENTO_RGB, 0.35); border-color: ACENTO; }
+button:focus { outline-color: ACENTO; }
+/* Campos de texto */
+entry:focus, spinbutton:focus { border-color: ACENTO; box-shadow: 0 0 5px rgba(ACENTO_RGB, 0.6); }
+entry selection { background-color: ACENTO; }
+/* Barras, deslizadores, interruptores, casillas */
+progressbar progress, levelbar block.filled, scale highlight, scale trough highlight {
+  background-color: ACENTO; background-image: none; border-color: ACENTO;
+}
+switch:checked { background-color: ACENTO; background-image: none; border-color: ACENTO; }
+check:checked, radio:checked, check:indeterminate { background-color: ACENTO; border-color: ACENTO; color: #0a0218; }
+scrollbar slider:hover, scrollbar slider:active { background-color: ACENTO; }
+/* Pestañas y enlaces */
+notebook > header tab:checked { box-shadow: inset 0 -3px ACENTO; }
+link, *:link { color: ACENTO; }
+/* Barra de tareas y menú de inicio */
+.xfce4-panel button:hover { background-color: rgba(ACENTO_RGB, 0.18); box-shadow: 0 0 8px ACENTO; }
+.xfce4-panel button:checked, .xfce4-panel .tasklist button:checked {
+  background-color: rgba(ACENTO_RGB, 0.30); box-shadow: inset 0 -3px ACENTO;
+}
+#whiskermenu-window treeview:selected, #whiskermenu-window button:checked { background-color: ACENTO; color: #0a0218; }

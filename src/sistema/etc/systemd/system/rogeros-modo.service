@@ -1,0 +1,10 @@
+[Unit]
+Description=RogerOS - aplicar perfil de rendimiento guardado
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '/usr/local/bin/roger modo "$(cat /etc/rogeros/modo 2>/dev/null || echo normal)"'
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Fondos de RogerOS
+Comment=Elige un fondo de pantalla del pack de RogerOS
+Exec=rogeros-fondos
+Icon=preferences-desktop-wallpaper
+Categories=Settings;DesktopSettings;
+Keywords=fondo;wallpaper;escritorio;

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Cambia el color de acento de RogerOS para el usuario actual.
+# Uso: rogeros-acento '#ffc400'      (sin argumento: reaplica el guardado)
+CONF=~/.config/rogeros; mkdir -p "$CONF" ~/.config/gtk-3.0
+C="${1:-$(cat "$CONF/acento" 2>/dev/null || echo '#00e5ff')}"
+[[ "$C" =~ ^#[0-9a-fA-F]{6}$ ]] || { echo "Color no válido: $C" >&2; exit 1; }
+echo "$C" > "$CONF/acento"
+RGB=$(printf '%d,%d,%d' 0x${C:1:2} 0x${C:3:2} 0x${C:5:2})
+
+# 1. Aplicaciones GTK (ventanas, barra de tareas, menú, Centro, tienda...)
+sed -e "s/ACENTO_RGB/$RGB/g" -e "s/ACENTO/$C/g" /usr/share/rogeros/gtk-acento.css > ~/.config/gtk-3.0/gtk.css
+
+# 2. Terminal: cursor y negritas del color de acento
+T=~/.config/xfce4/terminal/terminalrc
+if [ -f "$T" ]; then
+  sed -i -e "s/^ColorCursor=.*/ColorCursor=$C/" -e "s/^ColorBold=.*/ColorBold=$C/" "$T"
+fi
+
+# 3. Recargar el tema para que se vea YA en todo lo abierto
+if command -v xfconf-query >/dev/null && [ -n "$DISPLAY" ]; then
+  tema=$(xfconf-query -c xsettings -p /Net/ThemeName 2>/dev/null || echo Arc-Dark)
+  xfconf-query -c xsettings -p /Net/ThemeName -s Adwaita 2>/dev/null
+  sleep 0.4
+  xfconf-query -c xsettings -p /Net/ThemeName -s "$tema" 2>/dev/null
+fi

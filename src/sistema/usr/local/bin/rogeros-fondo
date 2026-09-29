@@ -1,0 +1,27 @@
+#!/bin/bash
+# Pone el fondo de escritorio en todos los monitores y escritorios, y hace que se vea YA.
+# Uso: rogeros-fondo [nombre del pack (lago, neon, aurora...) | /ruta/imagen]
+#      sin argumento: el que tenías elegido (o el lago)
+PACK=/usr/share/backgrounds/rogeros/pack
+CONF=~/.config/rogeros; mkdir -p "$CONF"
+ELEGIDO="${1:-$(cat "$CONF/fondo" 2>/dev/null || echo lago)}"
+if [ -f "$PACK/$ELEGIDO.png" ]; then
+  F="$PACK/$ELEGIDO.png"
+elif [ -f "$ELEGIDO" ]; then
+  F="$ELEGIDO"
+else
+  ELEGIDO=lago; F="$PACK/lago.png"          # lo guardado ya no existe: volver al de serie
+fi
+echo "$ELEGIDO" > "$CONF/fondo"
+
+props=$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E 'last-image$')
+# Si el escritorio aún no creó sus propiedades, crear las de cada monitor
+[ -z "$props" ] && for m in $(xrandr --listmonitors 2>/dev/null | awk 'NR>1{print $4}'); do
+  props="$props /backdrop/screen0/monitor$m/workspace0/last-image"
+done
+for p in $props; do
+  xfconf-query -c xfce4-desktop -p "$p" -n -t string -s "$F"
+  xfconf-query -c xfce4-desktop -p "${p%last-image}image-style" -n -t int -s 5
+done
+# xfdesktop guarda la imagen en memoria: recargar para que se vea al momento
+xfdesktop --reload >/dev/null 2>&1 &

@@ -1,0 +1,6 @@
+clave/
+*.asc
+config.json
+repo/
+__pycache__/
+*.iso

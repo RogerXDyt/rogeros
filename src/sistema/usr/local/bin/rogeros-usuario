@@ -1,0 +1,17 @@
+#!/bin/bash
+# Aplica a TU sesión lo que traiga una actualización de RogerOS (fondo, color de acento...).
+# Se ejecuta al entrar y al terminar de actualizar. Solo hace algo si cambió la versión,
+# salvo con --forzar. Aquí se añaden los cambios de usuario de cada versión nueva.
+CONF=~/.config/rogeros; mkdir -p "$CONF"
+V=$(cat /etc/rogeros/version 2>/dev/null)
+[ "$1" != "--forzar" ] && [ "$(cat "$CONF/version-aplicada" 2>/dev/null)" = "$V" ] && exit 0
+
+rogeros-acento          # reaplicar el color con la plantilla nueva
+rogeros-fondo           # reaplicar el fondo y recargar el escritorio
+
+# 1.1.3: ImprPant abre Flameshot (recortar, marcar, copiar)
+if command -v flameshot >/dev/null; then
+  xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/Print" -n -t string -s "flameshot gui"
+fi
+
+echo "$V" > "$CONF/version-aplicada"

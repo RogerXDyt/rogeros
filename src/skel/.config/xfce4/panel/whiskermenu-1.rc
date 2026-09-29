@@ -1,0 +1,7 @@
+button-title=RogerOS
+button-icon=/usr/share/rogeros/logo.png
+show-button-title=false
+menu-opacity=90
+position-search-alternate=true
+position-categories-horizontal=true
+view-mode=1

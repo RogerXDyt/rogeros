@@ -1,0 +1,12 @@
+#!/bin/sh
+# Reinicio tras instalar: primero se asegura de que TODO está escrito en el disco
+# y desmontado limpio. Sin esto el disco quedaba "sucio" y GRUB podía colgarse
+# en "Welcome to GRUB!" al primer arranque.
+sync
+# Lo que montó el instalador y lo que montó el escritorio solo (/media/...)
+for m in $(findmnt -rn -o TARGET | grep -E '^/tmp/calamares-root|^/media/' | sort -r); do
+  umount "$m" 2>/dev/null || umount -l "$m"
+done
+sync
+sleep 2
+exec systemctl -i reboot

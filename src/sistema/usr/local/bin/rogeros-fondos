@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""Selector de fondos de RogerOS: miniaturas grandes del pack, un clic y listo."""
+import json, os, subprocess
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GdkPixbuf
+
+PACK = "/usr/share/backgrounds/rogeros/pack"
+LOGO = "/usr/share/rogeros/logo.png"
+CONF = os.path.expanduser("~/.config/rogeros")
+try:
+    ACENTO = open(os.path.join(CONF, "acento")).read().strip() or "#00e5ff"
+except OSError:
+    ACENTO = "#00e5ff"
+
+CSS = f"""
+window {{ background-color: #0a0218; color: #e0f7ff; }}
+.titulo {{ font-size: 20pt; font-weight: 800; color: {ACENTO}; }}
+.foto {{ border: 3px solid transparent; border-radius: 12px; padding: 4px; background: #150533; }}
+.foto:hover {{ border-color: {ACENTO}; }}
+.activa {{ border-color: {ACENTO}; box-shadow: 0 0 14px {ACENTO}; }}
+.nombre {{ color: #e0f7ff; font-weight: bold; }}
+.neon {{ background-image: none; background-color: transparent; color: {ACENTO}; border: 2px solid {ACENTO};
+         border-radius: 10px; padding: 8px 20px; font-weight: bold; }}
+""".encode()
+
+
+def actual():
+    try:
+        return open(os.path.join(CONF, "fondo")).read().strip()
+    except OSError:
+        return "lago"
+
+
+class Selector(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Fondos de RogerOS")
+        self.set_default_size(1060, 700)
+        if os.path.exists(LOGO): self.set_icon_from_file(LOGO)
+        p = Gtk.CssProvider(); p.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), p, 800)
+        self.connect("destroy", Gtk.main_quit)
+
+        caja = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14, margin=22); self.add(caja)
+        cab = Gtk.Box()
+        t = Gtk.Label(label="Elige tu fondo", xalign=0); t.get_style_context().add_class("titulo")
+        cab.pack_start(t, True, True, 0)
+        mia = Gtk.Button(label="Usar una foto mía…"); mia.get_style_context().add_class("neon")
+        mia.connect("clicked", self.foto_propia); cab.pack_end(mia, False, False, 0)
+        caja.pack_start(cab, False, False, 0)
+
+        sc = Gtk.ScrolledWindow(); caja.pack_start(sc, True, True, 0)
+        self.rejilla = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+                                   max_children_per_line=3, min_children_per_line=2,
+                                   column_spacing=14, row_spacing=14, valign=Gtk.Align.START)
+        sc.add(self.rejilla)
+        try:
+            nombres = json.load(open(os.path.join(PACK, "nombres.json"), encoding="utf-8"))
+        except OSError:
+            nombres = {}
+        self.tarjetas = {}
+        for f in sorted(os.listdir(PACK)):
+            if not f.endswith(".png"):
+                continue
+            clave = f[:-4]
+            mini = os.path.join(PACK, "mini", clave + ".jpg")
+            img = Gtk.Image.new_from_pixbuf(GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                mini if os.path.exists(mini) else os.path.join(PACK, f), 320, 180, True))
+            b = Gtk.Button(); b.get_style_context().add_class("foto"); b.set_relief(Gtk.ReliefStyle.NONE)
+            v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6); v.pack_start(img, False, False, 0)
+            n = Gtk.Label(label=nombres.get(clave, clave.capitalize())); n.get_style_context().add_class("nombre")
+            v.pack_start(n, False, False, 0); b.add(v)
+            b.connect("clicked", lambda _b, c=clave: self.poner(c))
+            self.rejilla.add(b); self.tarjetas[clave] = b
+        self.marcar(actual())
+        self.show_all()
+
+    def marcar(self, clave):
+        for c, b in self.tarjetas.items():
+            (b.get_style_context().add_class if c == clave else b.get_style_context().remove_class)("activa")
+
+    def poner(self, clave):
+        subprocess.Popen(["rogeros-fondo", clave])
+        self.marcar(clave)
+
+    def foto_propia(self, _b):
+        d = Gtk.FileChooserDialog(title="Elige una foto", parent=self, action=Gtk.FileChooserAction.OPEN)
+        d.add_buttons("Cancelar", Gtk.ResponseType.CANCEL, "Usar de fondo", Gtk.ResponseType.OK)
+        filtro = Gtk.FileFilter(); filtro.set_name("Imágenes"); filtro.add_mime_type("image/*"); d.add_filter(filtro)
+        d.set_current_folder(os.path.expanduser("~/Imágenes") if os.path.isdir(os.path.expanduser("~/Imágenes"))
+                             else os.path.expanduser("~"))
+        if d.run() == Gtk.ResponseType.OK:
+            subprocess.Popen(["rogeros-fondo", d.get_filename()]); self.marcar(None)
+        d.destroy()
+
+
+if __name__ == "__main__":
+    Selector()
+    Gtk.main()

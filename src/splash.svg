@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <filter id="g" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#05010f"/><stop offset="1" stop-color="#1a0536"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <g stroke="#ff2bd6" stroke-width="1" opacity="0.35">
+    <line x1="0" y1="560" x2="800" y2="560"/><line x1="0" y1="580" x2="800" y2="580"/>
+    <line x1="400" y1="540" x2="100" y2="600"/><line x1="400" y1="540" x2="700" y2="600"/>
+    <line x1="400" y1="540" x2="250" y2="600"/><line x1="400" y1="540" x2="550" y2="600"/>
+  </g>
+  <text x="400" y="150" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-weight="bold" font-size="64" letter-spacing="10" fill="none" stroke="#00e5ff" stroke-width="2.5" filter="url(#g)">ROGER<tspan stroke="#ff2bd6">OS</tspan></text>
+  <text x="400" y="190" text-anchor="middle" font-family="DejaVu Sans, sans-serif" font-size="18" letter-spacing="8" fill="#00e5ff" opacity="0.8">L I N U X</text>
+  <rect x="80" y="260" width="640" height="220" rx="8" fill="#0b0220" fill-opacity="0.7" stroke="#00e5ff" stroke-opacity="0.6"/>
+</svg>

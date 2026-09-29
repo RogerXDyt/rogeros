@@ -1,0 +1,31 @@
+#!/bin/sh
+# Se ejecuta al entrar al escritorio: fondo y atajos la primera vez, y sonido de bienvenida siempre
+M=~/.config/rogeros/primer-inicio-hecho
+if [ ! -f "$M" ]; then
+  sleep 2
+  rogeros-fondo
+  a() { xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/$1" -n -t string -s "$2"; }
+  a "Super_L"          "xfce4-popup-whiskermenu"
+  a "<Super>t"         "xfce4-terminal"
+  a "<Super>e"         "thunar"
+  a "<Super>r"         "rogercentro"
+  a "<Super>g"         "rogercentro rendimiento"
+  a "<Super>l"         "xflock4"
+  a "Print"            "xfce4-screenshooter -f"
+  a "<Shift>Print"     "xfce4-screenshooter -r"
+  a "<Primary><Shift>Escape" "xfce4-taskmanager"
+  mkdir -p ~/.config/rogeros && touch "$M"
+fi
+# Cambios de usuario de la versión instalada (fondo, color...) si ha habido actualización
+rogeros-usuario
+
+# Icono "Instalar RogerOS" en el escritorio: solo en el modo en vivo
+ESC=$(xdg-user-dir DESKTOP 2>/dev/null || echo ~/Escritorio)
+if [ -d /run/live ]; then
+  mkdir -p "$ESC"
+  cp /usr/share/rogeros/instalar-rogeros.desktop "$ESC/" && chmod 755 "$ESC/instalar-rogeros.desktop"
+  gio set "$ESC/instalar-rogeros.desktop" metadata::trusted true 2>/dev/null
+else
+  rm -f "$ESC/instalar-rogeros.desktop"
+fi
+paplay /usr/share/sounds/rogeros/inicio.wav 2>/dev/null

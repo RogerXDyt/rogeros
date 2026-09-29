@@ -1,0 +1,4 @@
+# Cambiar el modo de rendimiento y actualizar RogerOS no piden contraseña
+%sudo ALL=(root) NOPASSWD: /usr/local/bin/roger modo *
+%sudo ALL=(root) NOPASSWD: /usr/lib/rogeros/actualizar-root buscar
+%sudo ALL=(root) NOPASSWD: /usr/lib/rogeros/actualizar-root aplicar

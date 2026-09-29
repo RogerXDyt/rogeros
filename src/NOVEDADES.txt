@@ -1,0 +1,10 @@
+Novedades de RogerOS 1.0
+
+🖼  Pack de 14 fondos: paisajes hechos con IA (aurora, galaxia, cerezos, playa, ciudad neón...)
+    y el Neón clásico. Nuevo selector sencillo en Centro › Apariencia › Cambiar fondo.
+🎨  Colores de acento de verdad: 8 colores que cambian botones, selecciones, barra de tareas,
+    terminal y todas las apps de RogerOS.
+🎧  Bluetooth: conecta cascos, altavoces y mandos (icono en la barra de tareas).
+🔋  Más batería en portátiles: ahorro de energía automático (TLP).
+📸  Capturas mejores: pulsa ImprPant para recortar, marcar y copiar.
+🛠  Arreglos: el fondo nuevo se aplica al momento al actualizar, sin cerrar sesión.

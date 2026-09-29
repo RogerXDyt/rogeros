@@ -1,0 +1,72 @@
+# Pantalla de carga de RogerOS: logo que palpita + barra de progreso neón con porcentaje
+Window.SetBackgroundTopColor(0.02, 0.00, 0.06);
+Window.SetBackgroundBottomColor(0.10, 0.02, 0.21);
+
+ancho = Window.GetWidth();
+alto = Window.GetHeight();
+cx = Window.GetX() + ancho / 2;
+cy = Window.GetY() + alto / 2;
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetPosition(cx - logo.image.GetWidth() / 2, cy - logo.image.GetHeight() / 2 - 60, 10);
+
+# Marco y relleno de la barra
+BARRA_W = 420;
+marco.image = Image("marco.png");
+marco.sprite = Sprite(marco.image);
+marco.x = cx - marco.image.GetWidth() / 2;
+marco.y = cy + 110;
+marco.sprite.SetPosition(marco.x, marco.y, 10);
+
+relleno.original = Image("relleno.png");
+relleno.sprite = Sprite();
+relleno.sprite.SetPosition(marco.x + 4, marco.y + 4, 11);
+
+texto.sprite = Sprite();
+texto.sprite.SetPosition(0, marco.y + 34, 12);
+
+progreso_actual = 0;
+progreso_mostrado = 0;
+t = 0;
+
+fun poner_texto(msg) {
+  texto.image = Image.Text(msg, 0.0, 0.9, 1.0);
+  texto.sprite.SetImage(texto.image);
+  texto.sprite.SetX(cx - texto.image.GetWidth() / 2);
+}
+
+fun al_progresar(duracion, progreso) {
+  progreso_actual = progreso;
+}
+Plymouth.SetBootProgressFunction(al_progresar);
+
+fun refrescar() {
+  t++;
+  # Logo que palpita
+  logo.sprite.SetOpacity(0.65 + 0.35 * Math.Sin(t / 12));
+  # La barra avanza suave hacia el progreso real
+  progreso_mostrado = progreso_mostrado + (progreso_actual - progreso_mostrado) * 0.08;
+  w = Math.Int(BARRA_W * progreso_mostrado);
+  if (w < 2) w = 2;
+  relleno.sprite.SetImage(relleno.original.Scale(w, relleno.original.GetHeight()));
+  # OJO: no usar Plymouth.GetMode() aquí: rompe el script y Plymouth se queda con el teclado y el ratón
+  if (t % 6 == 0) {
+    poner_texto("Cargando RogerOS...  " + Math.Int(progreso_mostrado * 100) + " %");
+  }
+}
+Plymouth.SetRefreshFunction(refrescar);
+
+# Contraseña (disco cifrado)
+fun pedir_clave(prompt, puntos) {
+  poner_texto(prompt + "  " + puntos);
+}
+Plymouth.SetDisplayPasswordFunction(pedir_clave);
+
+# Mensajes del sistema
+fun mensaje(texto_msg) {
+  poner_texto(texto_msg);
+}
+Plymouth.SetMessageFunction(mensaje);
+
+poner_texto("Cargando RogerOS...  0 %");

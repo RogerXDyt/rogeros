@@ -1,0 +1,5 @@
+// RogerOS: los parches de SEGURIDAD de Debian se instalan solos cada día (unattended-upgrades).
+// El resto de novedades (y las versiones de RogerOS) se instalan con el botón Actualizar.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
